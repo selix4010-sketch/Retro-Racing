@@ -1,6 +1,7 @@
 package com.racing.gui;
 
 import java.awt.*;
+import java.io.InputStream;
 import javax.swing.*;
 
 public class PanelSeleccionCarros extends JPanel {
@@ -13,33 +14,36 @@ public class PanelSeleccionCarros extends JPanel {
     private JComboBox<String> comboP2;
     private JLabel lblPreviewP1;
     private JLabel lblPreviewP2;
+    
+    private Font fuenteExacta;
 
     private final String[] nombresCarros = {
-        "Carro 1 (Clásico / Azul)", 
-        "Carro 2 (Deportivo / Rojo)", 
-        "Carro 3 (Turbo / Verde)", 
-        "Carro 4 (Rayo / Amarillo)"
+        "Carro 1 Clasico Azul", 
+        "Carro 2 Deportivo Rojo", 
+        "Carro 3 Turbo Verde", 
+        "Carro 4 Rayo Amarillo"
     };
 
     public PanelSeleccionCarros(VentanaPrincipal ventana, boolean esDosJugadores) {
         this.ventanaPrincipal = ventana;
         this.esDosJugadores = esDosJugadores;
         setLayout(new BorderLayout());
+        
+        cargarFuentePersonalizada();
 
-        JLabel lblTitulo = new JLabel("SELECCIÓN DE VEHÍCULOS", JLabel.CENTER);
-        lblTitulo.setFont(new Font("SansSerif", Font.BOLD | Font.ITALIC, 38));
+        JLabel lblTitulo = new JLabel("SELECCION DE VEHICULOS", JLabel.CENTER);
+        lblTitulo.setFont(fuenteExacta.deriveFont(Font.PLAIN, 36f));
         lblTitulo.setForeground(Color.YELLOW);
         lblTitulo.setBorder(BorderFactory.createEmptyBorder(60, 0, 20, 0));
         add(lblTitulo, BorderLayout.NORTH);
 
         JPanel panelCentro = new JPanel(new GridLayout(1, esDosJugadores ? 2 : 1, 40, 0));
         panelCentro.setOpaque(false);
-        // Márgenes laterales amplios para centrar los paneles
         panelCentro.setBorder(BorderFactory.createEmptyBorder(20, esDosJugadores ? 60 : 250, 40, esDosJugadores ? 60 : 250));
 
-        panelCentro.add(crearPanelJugadorSelector("JUGADOR 1 (WASD)", 1, Color.CYAN));
+        panelCentro.add(crearPanelJugadorSelector("JUGADOR 1 WASD", 1, Color.CYAN));
         if (esDosJugadores) {
-            panelCentro.add(crearPanelJugadorSelector("JUGADOR 2 (FLECHAS)", 2, Color.RED));
+            panelCentro.add(crearPanelJugadorSelector("JUGADOR 2 FLECHAS", 2, Color.RED));
             carroP2Seleccionado = 2;
         }
 
@@ -47,11 +51,10 @@ public class PanelSeleccionCarros extends JPanel {
 
         JPanel panelInferior = new JPanel(new BorderLayout());
         panelInferior.setOpaque(false);
-        // Márgenes grandes a los lados para que el botón no sea excesivamente largo
         panelInferior.setBorder(BorderFactory.createEmptyBorder(20, 220, 80, 220));
 
-        JButton btnComenzar = new JButton("¡LISTOS... FUERA!");
-        btnComenzar.setFont(new Font("SansSerif", Font.BOLD | Font.ITALIC, 28));
+        JButton btnComenzar = new JButton("!LISTOS FUERA!");
+        btnComenzar.setFont(fuenteExacta.deriveFont(Font.PLAIN, 28f));
         btnComenzar.setBackground(new Color(0, 0, 150));
         btnComenzar.setForeground(Color.WHITE);
         btnComenzar.setFocusPainted(false);
@@ -84,6 +87,19 @@ public class PanelSeleccionCarros extends JPanel {
         panelInferior.add(btnComenzar, BorderLayout.CENTER);
         add(panelInferior, BorderLayout.SOUTH);
     }
+    
+    private void cargarFuentePersonalizada() {
+        try {
+            InputStream is = getClass().getResourceAsStream("/com/racing/res/topgear.ttf");
+            if (is != null) {
+                fuenteExacta = Font.createFont(Font.TRUETYPE_FONT, is);
+            } else {
+                fuenteExacta = new Font("SansSerif", Font.BOLD | Font.ITALIC, 24);
+            }
+        } catch (Exception e) {
+            fuenteExacta = new Font("SansSerif", Font.BOLD | Font.ITALIC, 24);
+        }
+    }
 
     private JPanel crearPanelJugadorSelector(String titulo, int jugadorID, Color colorBorde) {
         JPanel panel = new JPanel();
@@ -95,12 +111,12 @@ public class PanelSeleccionCarros extends JPanel {
         ));
 
         JLabel lblJugador = new JLabel(titulo);
-        lblJugador.setFont(new Font("SansSerif", Font.BOLD, 22));
+        lblJugador.setFont(fuenteExacta.deriveFont(Font.PLAIN, 22f));
         lblJugador.setForeground(Color.WHITE);
         lblJugador.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JLabel lblInstruccion = new JLabel("Elige tu diseño:");
-        lblInstruccion.setFont(new Font("Monospaced", Font.PLAIN, 16));
+        JLabel lblInstruccion = new JLabel("Elige tu diseno");
+        lblInstruccion.setFont(fuenteExacta.deriveFont(Font.PLAIN, 16f));
         lblInstruccion.setForeground(Color.LIGHT_GRAY);
         lblInstruccion.setAlignmentX(Component.CENTER_ALIGNMENT);
 
@@ -109,12 +125,31 @@ public class PanelSeleccionCarros extends JPanel {
         lblPreview.setPreferredSize(new Dimension(100, 160));
 
         JComboBox<String> combo = new JComboBox<>(nombresCarros);
-        combo.setFont(new Font("Arial", Font.BOLD, 15));
-        combo.setPreferredSize(new Dimension(240, 40)); 
-        combo.setBackground(Color.WHITE);
-        combo.setForeground(Color.BLACK);
+        combo.setFont(fuenteExacta.deriveFont(Font.PLAIN, 15f));
+        combo.setPreferredSize(new Dimension(280, 40)); 
+        combo.setBackground(new Color(0, 0, 60)); // Azul marino retro en lugar de blanco
+        combo.setForeground(Color.YELLOW);
+        combo.setFocusable(false);
+        combo.setBorder(BorderFactory.createLineBorder(colorBorde, 2));
 
-        // Envase (FlowLayout) para evitar que el JComboBox se estire horizontalmente
+        // Personalización para centrar el texto y pintar el menú desplegable con estilo retro
+        DefaultListCellRenderer rendererCentro = new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                Component c = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                setHorizontalAlignment(SwingConstants.CENTER);
+                if (isSelected) {
+                    c.setBackground(Color.YELLOW);
+                    c.setForeground(Color.BLACK);
+                } else {
+                    c.setBackground(new Color(0, 0, 60));
+                    c.setForeground(Color.WHITE);
+                }
+                return c;
+            }
+        };
+        combo.setRenderer(rendererCentro);
+
         JPanel panelComboContenedor = new JPanel();
         panelComboContenedor.setOpaque(false);
         panelComboContenedor.add(combo);

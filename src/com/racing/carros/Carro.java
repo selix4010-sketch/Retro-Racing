@@ -7,15 +7,19 @@ import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 
+// Maneja la logica independiente de cada vehiculo: fisicas, colisiones con el mapa y la IA
 public class Carro {
     
+    // Posicion y orientacion en el mapa
     private double x, y;
     private final double xInicial, yInicial, anguloInicial;
     private double velocidad;
     private double angulo; 
     
+    // Banderas de control de movimiento
     public boolean acelerando, frenando, girandoIzquierda, girandoDerecha;
 
+    // Constantes fisicas del comportamiento del auto
     private final double ACELERACION = 0.18; 
     private final double FRICCION = 0.05;
     private double velocidadMaximaActual = 5.0; 
@@ -25,14 +29,17 @@ public class Carro {
     private boolean esIA;
     private Color colorEmergencia;
     
+    // Estadisticas de carrera
     private String nombrePiloto;
     private int vueltas = 0;
     private boolean pasoCheckpoint = false;
     private long tiempoUltimoPasoMeta = 0;
 
+    // Ruta de navegacion (nodos) predefinida para que la IA sepa por donde conducir
     private int[][] waypoints;
     private int waypointActual = 0;
     
+    // Variables para que la IA aprenda y evite atascarse
     private int[] contadorChoquesPorNodo;
     private double[] offsetAprendizajeX;
 
@@ -50,6 +57,7 @@ public class Carro {
         
         cargarSprite(rutaSprite);
         
+        // Coordenadas secuenciales del centro de la pista para guiar a la IA
         waypoints = new int[][] {
             {103, 346}, {108, 405}, {116, 448}, {161, 494}, {213, 547},
             {272, 605}, {337, 644}, {385, 624}, {396, 563}, {402, 493},
@@ -78,9 +86,11 @@ public class Carro {
         }
     }
 
+    // Lee los pixeles de la imagen de colisiones para saber si el auto toco cesped o muro
     private boolean esMuro(double testX, double testY, BufferedImage mapa, int anchoPantalla, int altoPantalla) {
         if (mapa == null || anchoPantalla <= 0 || altoPantalla <= 0) return true;
         
+        // Mapea la resolucion de la pantalla a la resolucion real de la imagen
         int mapX = (int) (testX * ((double) mapa.getWidth() / anchoPantalla));
         int mapY = (int) (testY * ((double) mapa.getHeight() / altoPantalla));
         
@@ -89,6 +99,7 @@ public class Carro {
             int alpha = (rgb >> 24) & 0xff;
             Color colorPixel = new Color(rgb, true);
             
+            // Detecta colision por transparencia, blanco puro o rojo oscuro (bordes)
             boolean esBlanco = colorPixel.getRed() > 220 && colorPixel.getGreen() > 220 && colorPixel.getBlue() > 220;
             boolean esRojo = colorPixel.getRed() > 150 && colorPixel.getGreen() < 100 && colorPixel.getBlue() < 100;
             
@@ -97,6 +108,7 @@ public class Carro {
         return true;
     }
 
+    // Calcula el nodo del circuito mas cercano a la posicion actual del vehiculo usando el teorema de Pitagoras
     private int obtenerWaypointMasCercano() {
         double menorDist = Double.MAX_VALUE;
         int idx = 0;
@@ -110,6 +122,8 @@ public class Carro {
         return idx;
     }
 
+    // Compara el angulo de giro del auto contra el angulo hacia el siguiente punto de la pista
+    // Si la diferencia es mayor a 130 grados, significa que va en reversa o sentido contrario
     public boolean vaEnSentidoContrario() {
         if (velocidad <= 0.5) return false; 
         int closest = obtenerWaypointMasCercano();
@@ -124,14 +138,17 @@ public class Carro {
         return diff > 130; 
     }
 
+    // Motor de fisicas que se ejecuta 60 veces por segundo
     public void actualizar(BufferedImage mapa, Rectangle lineaMeta, Rectangle checkpoint, boolean motorEncendido, int anchoPantalla, int altoPantalla) {
         if (!motorEncendido) return; 
 
         if (esIA) procesarInteligenciaArtificial();
 
+        // Aplicamos aceleracion o frenado
         if (acelerando) velocidad += ACELERACION;
         else if (frenando) velocidad -= ACELERACION;
 
+        // Friccion natural de la pista para que el auto se detenga si sueltas el acelerador
         if (velocidad > 0) {
             velocidad -= FRICCION;
             if (velocidad < 0) velocidad = 0;
@@ -140,16 +157,20 @@ public class Carro {
             if (velocidad > 0) velocidad = 0;
         }
 
+        // Topes de velocidad segun si va hacia adelante o en reversa
         if (velocidad > velocidadMaximaActual) velocidad = velocidadMaximaActual;
         if (velocidad < -velocidadMaximaActual / 2) velocidad = -velocidadMaximaActual / 2;
 
+        // Solo permite rotar el auto si esta en movimiento
         if (Math.abs(velocidad) > 0.1) {
             double dirRot = (velocidad > 0) ? 1 : -1;
             if (girandoIzquierda) angulo -= VELOCIDAD_ROTACION * dirRot;
             if (girandoDerecha) angulo += VELOCIDAD_ROTACION * dirRot;
         }
 
+        // Deteccion de colisiones predictiva
         if (esMuro(x, y, mapa, anchoPantalla, altoPantalla)) {
+            // Si el auto ya esta dentro de un muro (bug de empuje), lo forzamos hacia el centro de la pista
             int closest = obtenerWaypointMasCercano();
             
             if (esIA) {
@@ -166,13 +187,15 @@ public class Carro {
                 x += (dx / dist) * 2.5;
                 y += (dy / dist) * 2.5;
             }
-            velocidad *= 0.7;
+            velocidad *= 0.7; // Penalizacion fuerte de velocidad
             if (esIA) waypointActual = closest;
             
         } else {
+            // Calculamos hacia donde ira en el proximo frame usando trigonometria
             double futuroX = x + Math.cos(Math.toRadians(angulo)) * velocidad;
             double futuroY = y + Math.sin(Math.toRadians(angulo)) * velocidad;
 
+            // Si el paso futuro es un muro, deslizamos el auto a lo largo de la pared (Slide collision)
             if (esMuro(futuroX, futuroY, mapa, anchoPantalla, altoPantalla)) {
                 velocidad *= 0.85;
                 if (esIA) {
@@ -181,6 +204,7 @@ public class Carro {
                     waypointActual = closest;
                 }
 
+                // Verifica si puede moverse solo en X o solo en Y para deslizarse
                 boolean puedeMoverX = !esMuro(futuroX, y, mapa, anchoPantalla, altoPantalla);
                 boolean puedeMoverY = !esMuro(x, futuroY, mapa, anchoPantalla, altoPantalla);
 
@@ -189,7 +213,7 @@ public class Carro {
                 } else if (puedeMoverY && !puedeMoverX) {
                     y = futuroY;
                 } else {
-                    velocidad *= 0.5;
+                    velocidad *= 0.5; // Choque frontal
                 }
             } else {
                 x = futuroX;
@@ -197,6 +221,7 @@ public class Carro {
             }
         }
 
+        // Sistema antifraudes: Para sumar una vuelta, debe tocar el checkpoint primero (mitad de pista)
         long tiempoActual = System.currentTimeMillis();
 
         if (checkpoint.contains(x, y)) {
@@ -204,6 +229,7 @@ public class Carro {
         }
         
         if (lineaMeta.contains(x, y) && pasoCheckpoint) {
+            // Evita contar multiples vueltas seguidas si se queda parado en la meta
             if (tiempoActual - tiempoUltimoPasoMeta > 3000) {
                 vueltas++;
                 pasoCheckpoint = false; 
@@ -212,32 +238,39 @@ public class Carro {
         }
     }
 
+    // Calcula las acciones automaticas para los carros controlados por la computadora
     private void procesarInteligenciaArtificial() {
         double destX = waypoints[waypointActual][0] + offsetAprendizajeX[waypointActual];
         double destY = waypoints[waypointActual][1];
         
+        // Si ha chocado mucho en esta curva, reduce su velocidad maxima temporalmente
         if (contadorChoquesPorNodo[waypointActual] > 2) {
             velocidadMaximaActual = 3.5; 
         } else {
             velocidadMaximaActual = 5.0; 
         }
 
+        // Calcula el angulo que necesita para apuntar al objetivo
         double anguloDeseado = Math.toDegrees(Math.atan2(destY - y, destX - x));
         double diferenciaAngulo = anguloDeseado - angulo;
         
+        // Normaliza el angulo entre -180 y 180
         while (diferenciaAngulo <= -180) diferenciaAngulo += 360;
         while (diferenciaAngulo > 180) diferenciaAngulo -= 360;
 
         girandoDerecha = diferenciaAngulo > 5;
         girandoIzquierda = diferenciaAngulo < -5;
         
+        // Si va muy lento, permite rotar en su propio eje para salir de atascos
         if (Math.abs(velocidad) < 2.0) {
             if (girandoDerecha) angulo += 2.0;
             if (girandoIzquierda) angulo -= 2.0;
         }
 
+        // Frena antes de curvas pronunciadas
         acelerando = Math.abs(diferenciaAngulo) < 90;
 
+        // Si llego al waypoint actual, cambia el objetivo al siguiente
         double dist = Math.sqrt(Math.pow(destX - x, 2) + Math.pow(destY - y, 2));
         if (dist < 70) {
             waypointActual++;
@@ -245,23 +278,28 @@ public class Carro {
         }
     }
 
+    // Dibuja el vehiculo aplicando rotacion y traslacion al lienzo (Graphics2D)
     public void dibujar(Graphics2D g2) {
         AffineTransform txOriginal = g2.getTransform();
         g2.translate(x, y);
         g2.rotate(Math.toRadians(angulo));
         
         if (sprite != null) {
+            // Rotamos el sprite 90 grados por defecto porque las imagenes miran hacia la derecha
             g2.rotate(Math.toRadians(90));
             g2.drawImage(sprite, -9, -15, 18, 30, null); 
         } else {
+            // Fallback: Si no carga la imagen, dibuja un rectangulo con frente marcado
             g2.setColor(colorEmergencia);
             g2.fillRect(-15, -9, 30, 18); 
             g2.setColor(Color.WHITE);
             g2.fillRect(5, -3, 8, 6); 
         }
+        // Restaura la transformacion original para no afectar al resto del mapa
         g2.setTransform(txOriginal);
     }
 
+    // Getters y Setters
     public void setX(double x) { this.x = x; }
     public void setY(double y) { this.y = y; }
     public double getX() { return x; }
